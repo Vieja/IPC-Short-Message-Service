@@ -126,29 +126,47 @@ int main(int argc, char* argv[]) {
                 msgsnd(ID_LOG,&logout_response,sizeof(logout_response),0);
             }
 
-        struct ShowUsersRequest show_users_request;   //WYŚWIETLANIE ZALOGOWANYCH UŻYTKOWNIKÓW
+        struct UsersListRequest show_users_request;   //WYŚWIETLANIE ZALOGOWANYCH UŻYTKOWNIKÓW
             if ( msgrcv(ID_LOG,&show_users_request, sizeof(show_users_request),CLIENT_LOGGED_USERS_REQUEST,IPC_NOWAIT) != -1) {
                 puts("[SERWER] <show_users_request received>");
                 int i = find_field(show_users_request.username,loginy);
-                struct ShowUsersResponse show_users_response;
+                struct UsersListResponse show_users_response;
+                show_users_response.type = SERVER_LOGGED_USERS_RESPONSE;
+                strcpy(show_users_response.users,"");
                 if (i!=9) {  //POPRAWNY LOGIN
-                    strcpy(show_users_response.result,SUCCESS);
-                    show_users_response.type = SERVER_LOGGED_USERS_RESPONSE;
                     puts("[SERWER] Success: Login prawidłowy");
-                    int k = 0;
                     for (int j=0;j<9;j++) {
                         if (ID_USERS[j] != 0) {
-                            strcpy(show_users_response.userArray[k],loginy[j]);
-                            k++;
+                            strcat(show_users_response.users, loginy[j]);
+                            strcat(show_users_response.users,";");
                         }
                     }
-                    show_users_response.amount = k;
                 } else {
                     puts("[SERWER] Error: Błędny login");
-                    strcpy(show_users_response.result,FAILURE);
                 }
-                puts("[SERWER] <sending show_users_response");
+                puts("[SERWER] <sending show_users_response>");
                 msgsnd(ID_USERS[i],&show_users_response, sizeof(show_users_response),0);
+            }
+
+        struct Message message;  //  PRZEKAZYWANIE WIADOMOŚCI
+            if ( msgrcv(ID_LOG,&message, sizeof(message),CLIENT_MSG_REQUEST,IPC_NOWAIT) != -1) {
+                puts("[SERWER] <message received>");
+                //struct
+                int i = find_field(message.sender,loginy);
+                int j = find_field(message.receiver,loginy);
+                struct cmd_msg cmd_msg;
+                if (j != 9) { // JEŻELI ODBIORCA ISTNIEJE
+                    cmd_msg.type=SERVER_MSG_GET;
+                    strcpy(cmd_msg.message,message.message);
+                    puts("<sending cmd_msg>");
+                    if ( msgsnd(ID_USERS[j],&cmd_msg, sizeof(cmd_msg),0) != -1) { //JEŻELI WYSYŁANIE SIE POWIODŁO
+                        puts("[SERWER] Success: przekierowano wiadomość");
+                    } else {
+                        puts("[SERWER] Error: nir przekierowano wiadomości");
+                    }
+                } else {
+                    puts("[SERWER] Error: nieprawidłowy odbiorca");
+                }
             }
 
 

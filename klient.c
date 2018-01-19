@@ -2,13 +2,17 @@
 
 
 void help() {
-    puts("\n/help - wyświetl pomoc");
+    puts("\n------------------------------------");
+    puts("Dostępne opcje:");
+    puts("/help - wyświetl pomoc");
     puts("/show_users - wyświetl wszystkich zalogowanych użytkowników");
     puts("/logout - wyloguj");
     puts("/exit -zakończ");
+    puts("------------------------------------");
     puts("\nAby wysłać wiadomość:");
     puts("'adresat': 'treść wiadomości[200]'");
     puts("np.: dbrzez: Witaj!\n");
+    puts("------------------------------------\n");
 }
 
 void execute_order_66() {
@@ -24,17 +28,16 @@ struct user_data {
 struct user_data logowanie(int ID_LOG,int PID) {
     char password[30];
     struct user_data userData;
-    struct LoginRequest login_request;
-    login_request.pid = PID;
-    login_request.type = CLIENT_LOGIN_REQUEST;
-    struct LoginResponse login_response;
 
     while(1) {
+        struct LoginRequest login_request;
+        login_request.pid = PID;
+        login_request.type = CLIENT_LOGIN_REQUEST;
+        struct LoginResponse login_response;
+
         puts("\n[KLIENT] Wprowadź nazwę użytkownika:");
-       // fgets(userData.username,30,stdin);
         scanf("%s",userData.username);
         puts("[KLIENT] Wprowadź hasło:");
-       // fgets(password,30,stdin);
         scanf("%s",password);
         strcpy(login_request.username,userData.username);
         strcpy(login_request.password,password);
@@ -67,13 +70,22 @@ void wylogowanie(char username[30],int ID_LOG,int PID) {
     puts("[KLIENT] Success: Wylogowano pomyślnie");
 }
 
-void wyswietl_zalogowanych(char username[30],int ID_LOG,int ID_USER) {
+void wyswietl_zalogowanych(char username[30],int ID_LOG) {
     puts("[KLIENT] Wyświetlenie zalogowanych użytkowników");
-    struct ShowUsersRequest show_users_request;
+    struct UsersListRequest show_users_request;
     show_users_request.type = CLIENT_LOGGED_USERS_REQUEST;
     strcpy(show_users_request.username,username);
     puts("[KLIENT] <sending show_users_request>");
     msgsnd(ID_LOG,&show_users_request, sizeof(show_users_request),0);
+}
+
+void send_msg(char receiver[30],char* msg,int ID_LOG,char sender[30]) {
+    struct Message message;
+    message.type = CLIENT_MSG_REQUEST;
+    strcpy(message.receiver,receiver);
+    strcpy(message.sender,sender);
+    strcpy(message.message,msg);
+    msgsnd(ID_LOG,&message, sizeof(message),0);
 }
 
 
@@ -86,41 +98,43 @@ int main(int argc, char* argv[]) {
 
     if (!fork()) {
         while(1) { //NASŁUCHIWANIE PRYWATNEJ KOLEJKI
-            struct ShowUsersResponse show_users_response;
-            while( msgrcv(userData.ID_USER,&show_users_response, sizeof(show_users_response),SERVER_LOGGED_USERS_RESPONSE,0) == -1 ); //CZEKANIE NA ODPOWIEDZ SERWERA
-            if ( strcmp(show_users_response.result,SUCCESS) == 0) {
-                puts("\n[KLIENT] Zalogowani użytkownicy: \n");
-                for (int i = 0; i < show_users_response.amount; i++) {
-                    printf("%s\n", show_users_response.userArray[i]);
-                }
-            } else {
-                puts("[KLIENT] Error: wystąpił błąd");
+            struct UsersListResponse show_users_response;
+            if( msgrcv(userData.ID_USER,&show_users_response, sizeof(show_users_response),SERVER_LOGGED_USERS_RESPONSE,IPC_NOWAIT) != -1 ) {
+                puts("\n[KLIENT] Zalogowani użytkownicy:");
+                printf("%s\n", show_users_response.users);
             }
+
+            struct cmd_msg cmd_msg;
+            if( msgrcv(userData.ID_USER,&cmd_msg, sizeof(cmd_msg),SERVER_MSG_GET,IPC_NOWAIT) != -1 ) {
+                printf("%s", cmd_msg.message);
+            }
+
         }
     } else {
         while(1) { //OBSŁUGA STDIN
-            char text[300];
+            char text[300] = "";
             fgets(text,300,stdin);
             if ( strcmp(text,"/logout\n") == 0 ){     //LOGOUT
                 wylogowanie(userData.username,ID_LOG,PID);
-                while(1) {
-                    puts("\n/login - zaloguj ponownie");
-                    puts("/exit zakończ");
-                    fgets(text,300,stdin);
-                    if (strcmp(text, "/login\n") == 0) {userData = logowanie(ID_LOG,PID); break;}
-                    else if (strcmp(text, "/exit\n") == 0) {execute_order_66(); break;}
-                    else puts("[KLIENT] Wybrano niepoprawną opcję");
-                }
-            }
-            if ( strcmp(text,"/help\n") == 0 ){      // HELP
-                help();
-            }
-            if ( strcmp(text,"/exit\n") == 0 ){      // EXIT
-                wylogowanie(userData.username,ID_LOG,PID);
                 execute_order_66();
             }
-            if ( strcmp(text,"/show_users\n") == 0 ){   // SHOW_USERS
-                wyswietl_zalogowanych(userData.username,ID_LOG,userData.ID_USER);
+            else if ( strcmp(text,"/help\n") == 0 ){      // HELP
+                help();
+            }
+            else if ( strcmp(text,"/show_users\n") == 0 ){   // SHOW_USERS
+                wyswietl_zalogowanych(userData.username,ID_LOG);
+            }
+            else if ( strcmp(text,"") != 0 && text[0]!='\n'){
+                char username[30];
+                int i=0;
+                while (text[i]!=':') {
+                    username[i] = text[i];
+                    i++;
+                }
+                char *msg;
+                msg = strrchr(text,':');
+                send_msg(username,msg,ID_LOG,userData.username);
+
             }
 
 
