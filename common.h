@@ -25,18 +25,30 @@
 #define CLIENT_LOGIN_REQUEST 100
 #define CLIENT_LOGOUT_REQUEST 101
 #define CLIENT_LOGGED_USERS_REQUEST 102
+#define CLIENT_MSG_REQUEST 103
+#define CLIENT_GROUPS_REQUEST 105
+#define CLIENT_GROUP_USERS_REQUEST 106
 
 #define SERVER_LOGIN_RESPONSE 200
 #define SERVER_LOGOUT_RESPONSE 201
 #define SERVER_LOGGED_USERS_RESPONSE 202
+#define SERVER_MSG_RESPONSE 203
+#define SERVER_MSG_GET 204
+#define SERVER_GROUPS_RESPONSE 205
+#define SERVER_GROUP_USERS_RESPONSE 206
 
 
-// TODO: Dodac pole time_t
 struct Message {
     long type;
     char message[200];
     char sender[30];
     char receiver[30];
+};
+
+//struktura zwracana wysyłającemu
+struct MessageResponse {
+    long type;
+    char result[10];
 };
 
 struct LoginRequest {
@@ -62,15 +74,37 @@ struct LogoutResponse {
     char result[10];
 };
 
-struct ShowUsersRequest {
+struct UsersListRequest {
     long type;
     char username[30];
 };
 
-struct ShowUsersResponse {
+struct UsersListResponse {
     long type;
-    int amount;
-    char userArray[9][30];
+    char users[280];
+};
+
+// obsługa wyświetlania grup
+struct GroupsListRequest {
+    long type;
+    char username[30];
+};
+
+struct GroupsListResponse {
+    long type;
+    char groups[120];
+};
+
+//obsługa wyświetlania członków danej grupy
+struct GroupUsersRequest {
+    long type;
+    char username[30];
+    char group[30];
+};
+
+struct GroupUsersResponse {
+    long type;
+    char users[280];
     char result[10];
 };
 
